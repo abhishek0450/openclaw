@@ -48,16 +48,20 @@ export function isBotMentionedFromTargets(
     if (targets.selfE164 && targets.normalizedMentions.includes(targets.selfE164)) {
       return true;
     }
-    if (targets.selfJid) {
-      // Some mentions use the bare JID; match on E.164 to be safe.
-      if (targets.normalizedMentions.includes(targets.selfJid)) {
-        return true;
-      }
-    }
     // If the message explicitly mentions someone else, do not fall back to regex matches.
     return false;
   } else if (hasMentions && isSelfChat) {
-    // Self-chat mode: ignore WhatsApp @mention JIDs, otherwise @mentioning the owner in group chats triggers the bot.
+    // Self-chat mode: suppress mentions only when the sender IS the owner (WhatsApp auto-includes
+    // the owner's JID in mentionedJids). When someone else mentions the bot via JID or LID,
+    // normalizedMentions correctly resolves to E164 — honour that.
+    const senderIsOwner =
+      msg.senderE164 && targets.selfE164 && normalizeE164(msg.senderE164) === targets.selfE164;
+    if (!senderIsOwner) {
+      if (targets.selfE164 && targets.normalizedMentions.includes(targets.selfE164)) {
+        return true;
+      }
+    }
+    return false;
   }
   const bodyClean = clean(msg.body);
   if (mentionCfg.mentionRegexes.some((re) => re.test(bodyClean))) {
